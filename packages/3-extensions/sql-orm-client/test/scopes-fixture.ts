@@ -20,20 +20,18 @@ export type Tsquery = Expression<{ codecId: 'pg/tsquery@1'; nullable: false }>;
 /** Stands in for the Postgres facade's full-text kind, which this package cannot import. */
 export interface TestFullTextScope extends CollectionScopeKind {
   readonly match: { readonly type: 'fullText' };
-  readonly operations: { readonly fulltext: readonly [query: Tsquery] };
+  readonly parameters: readonly [query: Tsquery];
 }
 
-interface TestTrigramOperations<Index> {
-  readonly similar: readonly [
-    column: keyof (Index & { readonly columns: object })['columns'],
-    text: string,
-  ];
-}
+type TestTrigramParameters<Index> = readonly [
+  column: keyof (Index & { readonly columns: object })['columns'],
+  text: string,
+];
 
 /** A second index type that only these tests define. Its operation reads the index's literal columns. */
 export interface TestTrigramScope extends CollectionScopeKind {
   readonly match: { readonly type: 'test/trigram' };
-  readonly operations: TestTrigramOperations<this['index']>;
+  readonly parameters: TestTrigramParameters<this['index']>;
 }
 
 declare module '../src/scopes' {
@@ -53,45 +51,41 @@ function call(tools: CollectionScopeTools, name: string, ...args: unknown[]): un
 export const testFullTextScope: SqlCollectionScopeContribution = {
   id: 'test/fulltext',
   matches: (index) => index.type === 'fullText',
-  operations: {
-    fulltext: (collection, indexName, ...args) => {
-      const [query] = args as unknown as [Tsquery];
-      return collection
-        .where((_m, tools) =>
-          call(tools, 'fullTextMatches', tools.indexes[indexName] as IndexReference, query),
-        )
-        .orderBy((_m, tools) =>
-          (
-            call(
-              tools,
-              'fullTextRank',
-              tools.indexes[indexName] as IndexReference,
-              query,
-            ) as Orderable
-          ).desc(),
-        );
-    },
+  operation: (collection, indexName, ...args) => {
+    const [query] = args as unknown as [Tsquery];
+    return collection
+      .where((_m, tools) =>
+        call(tools, 'fullTextMatches', tools.indexes[indexName] as IndexReference, query),
+      )
+      .orderBy((_m, tools) =>
+        (
+          call(
+            tools,
+            'fullTextRank',
+            tools.indexes[indexName] as IndexReference,
+            query,
+          ) as Orderable
+        ).desc(),
+      );
   },
 };
 
 export const testTrigramScope: SqlCollectionScopeContribution = {
   id: 'test/trigram',
   matches: (index) => index.type === 'test/trigram',
-  operations: {
-    similar: (collection, indexName, ...args) => {
-      const [column, text] = args as unknown as [string, string];
-      const columnOf = (tools: CollectionScopeTools) =>
-        (tools.indexes[indexName] as IndexReference).columns[column];
-      return collection
-        .where((_m, tools) => call(tools, 'eq', columnOf(tools), text))
-        .orderBy((_m, tools) => {
-          const raw = tools.fns['raw'] as unknown as (
-            strings: TemplateStringsArray,
-            ...values: unknown[]
-          ) => { returns(spec: string): Orderable };
-          return raw`similarity(${columnOf(tools)}, ${text})`.returns('pg/float4@1').desc();
-        });
-    },
+  operation: (collection, indexName, ...args) => {
+    const [column, text] = args as unknown as [string, string];
+    const columnOf = (tools: CollectionScopeTools) =>
+      (tools.indexes[indexName] as IndexReference).columns[column];
+    return collection
+      .where((_m, tools) => call(tools, 'eq', columnOf(tools), text))
+      .orderBy((_m, tools) => {
+        const raw = tools.fns['raw'] as unknown as (
+          strings: TemplateStringsArray,
+          ...values: unknown[]
+        ) => { returns(spec: string): Orderable };
+        return raw`similarity(${columnOf(tools)}, ${text})`.returns('pg/float4@1').desc();
+      });
   },
 };
 

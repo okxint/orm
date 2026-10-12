@@ -9,12 +9,12 @@ import type { Filtered, Ordered } from './collection-types';
 import type { ModelIndexReferences } from './types';
 
 /**
- * The type half of a collection scope kind. An index whose reference is assignable to `match` has the kind's scope. `index` is filled with that index's reference, so `operations` can read it. `operations` maps each operation's name to its parameter list; the ORM client decides what an operation returns.
+ * The type half of a collection scope kind. An index whose reference is assignable to `match` has the kind's scope. `index` is filled with that index's reference, so `parameters` can read it. `parameters` is the parameter list of the scope's one operation; the ORM client decides what it returns.
  */
 export interface CollectionScopeKind {
   readonly match: unknown;
   readonly index: unknown;
-  readonly operations: object;
+  readonly parameters: readonly unknown[];
 }
 
 /**
@@ -32,32 +32,22 @@ type MatchingKinds<Ref> = {
     : never;
 }[KindId];
 
-type KindOperations<Kind, Ref> = Kind & { readonly index: Ref } extends {
-  readonly operations: infer Operations;
+type KindParameters<Kind, Ref> = Kind & { readonly index: Ref } extends {
+  readonly parameters: infer Parameters extends readonly unknown[];
 }
-  ? Operations
+  ? Parameters
   : never;
 
-type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
-  value: infer I,
-) => void
-  ? I
-  : never;
-
-type OperationsOf<Ref> = UnionToIntersection<
-  {
-    [Id in MatchingKinds<Ref>]: KindOperations<CollectionScopeRegistry[Id], Ref>;
-  }[MatchingKinds<Ref>]
->;
+type ParametersOf<Ref> = {
+  [Id in MatchingKinds<Ref>]: KindParameters<CollectionScopeRegistry[Id], Ref>;
+}[MatchingKinds<Ref>];
 
 /** What a scope operation returns: the collection it was called on, filtered and ordered. */
 export type ScopeResult<Self> = Ordered<Filtered<Self>>;
 
-export type ScopeOperations<Operations, Self> = {
-  readonly [Op in keyof Operations]: <Receiver extends Self = Self>(
-    ...args: Extract<Operations[Op], readonly unknown[]>
-  ) => ScopeResult<Receiver>;
-};
+export type ScopeOperation<Parameters, Self> = <Receiver extends Self = Self>(
+  ...args: Extract<Parameters, readonly unknown[]>
+) => ScopeResult<Receiver>;
 
 /** Each scope of a model, by name, with each operation's parameter list. It does not depend on the receiver, so TypeScript computes it once per model. */
 export type ModelScopeTable<
@@ -68,7 +58,7 @@ export type ModelScopeTable<
 > = {
   readonly [Name in keyof Refs as [MatchingKinds<Refs[Name]>] extends [never]
     ? never
-    : Name]: OperationsOf<Refs[Name]>;
+    : Name]: ParametersOf<Refs[Name]>;
 };
 
 /** The scopes of a model's collection `Self`: one per index of the model's table that a registered kind matches. */
@@ -79,7 +69,7 @@ export type CollectionScopes<
   Self,
   Table = ModelScopeTable<TContract, ModelName, NsId>,
 > = {
-  readonly [Name in keyof Table]: ScopeOperations<Table[Name], Self>;
+  readonly [Name in keyof Table]: ScopeOperation<Table[Name], Self>;
 };
 
 function readableIndexes(
@@ -102,17 +92,13 @@ export function createCollectionScopes(
   receiver: CollectionScopeReceiver,
   contributions: ReadonlyArray<SqlCollectionScopeContribution>,
   indexes: Readonly<Record<string, IndexReference>>,
-): Readonly<Record<string, Readonly<Record<string, (...args: never[]) => unknown>>>> {
-  const scopes: Record<string, Record<string, (...args: never[]) => unknown>> = {};
+): Readonly<Record<string, (...args: never[]) => unknown>> {
+  const scopes: Record<string, (...args: never[]) => unknown> = {};
   if (contributions.length === 0) return scopes;
   for (const [name, reference] of readableIndexes(indexes)) {
     for (const contribution of contributions) {
       if (!contribution.matches(reference)) continue;
-      const operations = scopes[name] ?? {};
-      scopes[name] = operations;
-      for (const [op, operation] of Object.entries(contribution.operations)) {
-        operations[op] = (...args: never[]) => operation(receiver, name, ...args);
-      }
+      scopes[name] = (...args: never[]) => contribution.operation(receiver, name, ...args);
     }
   }
   return scopes;

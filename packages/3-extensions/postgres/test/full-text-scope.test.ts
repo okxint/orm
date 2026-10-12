@@ -40,7 +40,7 @@ describe('the Postgres full-text scope', () => {
     };
     const { receiver, calls } = recordingReceiver(tools);
 
-    postgresFullTextScope.operations['fulltext']?.(receiver, 'post_search', 'q' as never);
+    postgresFullTextScope.operation(receiver, 'post_search', 'q' as never);
 
     expect(calls).toEqual([
       { method: 'where', result: { matches: [index, 'q'] } },

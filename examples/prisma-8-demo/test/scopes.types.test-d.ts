@@ -30,25 +30,25 @@ describe('scopes from the Postgres facade, through built output', () => {
   });
 
   test('a scope operation keeps the receiver and adds the filter and order facts', () => {
-    const result = custom.Post.forUser('u').scopes.post_search.fulltext(q);
+    const result = custom.Post.forUser('u').scopes.post_search(q);
     expectTypeOf(result).toExtend<PostCollection & HasWhere & HasOrderBy>();
     expectTypeOf(result.newestFirst()).toExtend<PostCollection>();
   });
 
   test('the row type chosen before the call is kept', () => {
-    const result = plain.Post.select('id', 'title').scopes.post_search.fulltext(q);
+    const result = plain.Post.select('id', 'title').scopes.post_search(q);
     expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: string; title: string }>();
   });
 
   test('a scope is offered inside an include refinement', () => {
     const result = plain.User.include('posts', (posts) =>
-      posts.scopes.post_title_search.fulltext(q).limit(3),
+      posts.scopes.post_title_search(q).limit(3),
     );
     expectTypeOf(result).not.toBeAny();
   });
 
   test('a wrong scope name is an error', () => {
     // @ts-expect-error no index is named `search`
-    plain.Post.scopes.search.fulltext(q);
+    plain.Post.scopes.search(q);
   });
 });

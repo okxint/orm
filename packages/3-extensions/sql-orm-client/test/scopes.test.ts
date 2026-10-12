@@ -33,7 +33,7 @@ describe('collection scopes', () => {
   const { db, plain, trigram } = createScopesOrm();
 
   it('filter by the index and order by its relevance', () => {
-    const users = plain.User.select('id').scopes.users_search.fulltext(q);
+    const users = plain.User.select('id').scopes.users_search(q);
 
     expect(usersSql(users.state)).toBe(
       `SELECT "users"."id" AS "id" FROM "public"."users" WHERE ${search} @@ websearch_to_tsquery('english', $1) ORDER BY ts_rank(${search}, websearch_to_tsquery('english', $1)) DESC`,
@@ -42,7 +42,7 @@ describe('collection scopes', () => {
 
   it('append a later orderBy after the relevance order', () => {
     const users = plain.User.select('id')
-      .scopes.users_search.fulltext(q)
+      .scopes.users_search(q)
       .orderBy((u) => u.id.asc());
 
     expect(usersSql(users.state)).toBe(
@@ -53,7 +53,7 @@ describe('collection scopes', () => {
   it('put an earlier orderBy before the relevance order', () => {
     const users = plain.User.select('id')
       .orderBy((u) => u.id.asc())
-      .scopes.users_search.fulltext(q);
+      .scopes.users_search(q);
 
     expect(usersSql(users.state)).toBe(
       `SELECT "users"."id" AS "id" FROM "public"."users" WHERE ${search} @@ websearch_to_tsquery('english', $1) ORDER BY "users"."id" ASC, ts_rank(${search}, websearch_to_tsquery('english', $1)) DESC`,
@@ -70,7 +70,7 @@ describe('collection scopes', () => {
 
   it('bind the index to the related table inside an include refinement', () => {
     const users = plain.User.select('id').include('invitedUsers', (invited) =>
-      invited.select('id').scopes.users_search.fulltext(q).limit(3),
+      invited.select('id').scopes.users_search(q).limit(3),
     );
 
     const sql = sqlOf(
@@ -91,7 +91,7 @@ describe('collection scopes', () => {
   });
 
   it('come from a second index type the ORM client does not know', () => {
-    const posts = trigram.Post.select('id').scopes.posts_title_trgm.similar('title', 'zebra');
+    const posts = trigram.Post.select('id').scopes.posts_title_trgm('title', 'zebra');
     const withTrigram = trigramContract();
 
     expect(

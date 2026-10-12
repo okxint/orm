@@ -118,7 +118,7 @@ export interface CollectionScopeReceiver {
   orderBy(order: (model: unknown, tools: CollectionScopeTools) => unknown): CollectionScopeReceiver;
 }
 
-/** A scope operation: refines `collection` using the index named `indexName`. */
+/** A scope's operation: refines `collection` using the index named `indexName`. */
 export type CollectionScopeOperation = (
   collection: CollectionScopeReceiver,
   indexName: string,
@@ -131,5 +131,5 @@ export type CollectionScopeOperation = (
 export interface SqlCollectionScopeContribution {
   readonly id: string;
   matches(index: IndexReference): boolean;
-  readonly operations: Readonly<Record<string, CollectionScopeOperation>>;
+  readonly operation: CollectionScopeOperation;
 }
