@@ -7,6 +7,7 @@ import type { SqlOperationRegistry } from '@internal/sql-operations';
 import type { SqlAggregateDescriptor, SqlAggregateLowering } from './aggregate-descriptor';
 import type { ContractCodecRegistry } from './ast/codec-types';
 import type { RawCodecInferer } from './expression';
+import type { IndexReference } from './index-reference';
 
 /**
  * Codec-id-keyed accessor for descriptor metadata. The unified read API for codec-id-keyed metadata (`traits`) — non-branching for parameterized vs. non-parameterized codecs. Every codec ships natively as a `CodecDescriptor` through the unified `codecs:` contributor slot (see ADR 208).
@@ -97,4 +98,38 @@ export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contr
    * The adapter's codec inferer, which `fns.raw` uses for a bare value interpolated into a template. An execution context built from an execution stack carries it.
    */
   readonly rawCodecInferer?: RawCodecInferer;
+  /**
+   * The collection scope kinds the target and extensions contribute. The ORM client offers a scope for each index one of them matches.
+   */
+  readonly collectionScopes?: ReadonlyArray<SqlCollectionScopeContribution>;
+}
+
+/** The second argument of an ORM `where` or `orderBy` callback, as a scope operation reads it. */
+export interface CollectionScopeTools {
+  readonly fns: Readonly<Record<string, (...args: never[]) => unknown>>;
+  readonly indexes: Readonly<Record<string, IndexReference>>;
+}
+
+/** The collection a scope operation refines: an ORM collection, seen only through `where` and `orderBy`. */
+export interface CollectionScopeReceiver {
+  where(
+    condition: (model: unknown, tools: CollectionScopeTools) => unknown,
+  ): CollectionScopeReceiver;
+  orderBy(order: (model: unknown, tools: CollectionScopeTools) => unknown): CollectionScopeReceiver;
+}
+
+/** A scope operation: refines `collection` using the index named `indexName`. */
+export type CollectionScopeOperation = (
+  collection: CollectionScopeReceiver,
+  indexName: string,
+  ...args: never[]
+) => CollectionScopeReceiver;
+
+/**
+ * The runtime half of a collection scope kind. `id` is the key its type half registers under in the ORM client's `CollectionScopeRegistry`.
+ */
+export interface SqlCollectionScopeContribution {
+  readonly id: string;
+  matches(index: IndexReference): boolean;
+  readonly operations: Readonly<Record<string, CollectionScopeOperation>>;
 }

@@ -349,11 +349,17 @@ function crossShellRewritePlugin(shellName: ShellName) {
       for (const [fileName, output] of Object.entries(bundle)) {
         if (!fileName.endsWith('.d.mts') || output.type !== 'chunk') continue;
         if (typeof output.code !== 'string') continue;
-        output.code = output.code.replace(
-          /import\((["'])(@internal\/[^"')]+)\1\)/g,
-          (_match, quote: string, source: string) =>
-            `import(${quote}${publicSpecifier(source, shellName).id}${quote})`,
-        );
+        output.code = output.code
+          .replace(
+            /import\((["'])(@internal\/[^"')]+)\1\)/g,
+            (_match, quote: string, source: string) =>
+              `import(${quote}${publicSpecifier(source, shellName).id}${quote})`,
+          )
+          .replace(
+            /declare module (["'])(@internal\/[^"']+)\1/g,
+            (_match, quote: string, source: string) =>
+              `declare module ${quote}${publicSpecifier(source, shellName).id}${quote}`,
+          );
       }
     },
   };

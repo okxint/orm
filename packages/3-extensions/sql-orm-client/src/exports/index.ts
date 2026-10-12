@@ -34,6 +34,13 @@ export {
   prepareQuery,
 } from '../prepared-row-query';
 export type {
+  CollectionScopeKind,
+  CollectionScopeRegistry,
+  CollectionScopes,
+  ScopeOperations,
+  ScopeResult,
+} from '../scopes';
+export type {
   AggregateBuilder,
   AggregateIncludeReducers,
   AggregateResult,

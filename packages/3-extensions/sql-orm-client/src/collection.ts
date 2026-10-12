@@ -29,6 +29,7 @@ import {
 } from '@internal/sql-relational-core/ast';
 import { type TraitExpression, toExpr } from '@internal/sql-relational-core/expression';
 import type { Preparable } from '@internal/sql-relational-core/plan';
+import type { CollectionScopeReceiver } from '@internal/sql-relational-core/query-lane-context';
 import { blindCast } from '@internal/utils/casts';
 import { ifDefined } from '@internal/utils/defined';
 import { InternalError } from '@internal/utils/internal-error';
@@ -155,6 +156,7 @@ import {
   mergeAnnotations,
 } from './query-plan';
 import { queryPlanRows } from './query-plan-rows';
+import { type CollectionScopes, createCollectionScopes } from './scopes';
 import {
   type AggregateBuilder,
   type AggregateIncludeReducers,
@@ -534,6 +536,22 @@ export class CollectionBase<
     return this.#cloneSelf<HasWhere>({
       filters: [...this.state.filters, filter],
     });
+  }
+
+  /**
+   * One scope per index of the model's table that a contributed scope kind matches, named as the index is named. A scope operation returns this collection, filtered by the index and ordered by its relevance.
+   */
+  get scopes(): CollectionScopes<TContract, ModelName, State['nsId'], this> {
+    return blindCast<
+      CollectionScopes<TContract, ModelName, State['nsId'], this>,
+      'the runtime offers a scope for each index a contribution matches, as the type does for the registry'
+    >(
+      createCollectionScopes(
+        blindCast<CollectionScopeReceiver, 'a collection has where and orderBy'>(this),
+        this.ctx.context.collectionScopes ?? [],
+        this.#callbackTools().indexes,
+      ),
+    );
   }
 
   #callbackTools(): ModelCallbackTools<TContract, ModelName, State['nsId']> {

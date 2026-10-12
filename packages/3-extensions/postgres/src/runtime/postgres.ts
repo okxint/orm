@@ -17,6 +17,7 @@ import {
   resolveOptionalPostgresBinding,
   resolvePostgresBinding,
 } from './binding';
+import { postgresFullTextScope } from './full-text-scope';
 import {
   buildPostgresRuntimeBoundMembers,
   type PostgresLifecycleMembers,
@@ -134,7 +135,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
   let binding = resolveOptionalPostgresBinding(options);
 
   const stack = createSqlExecutionStack({
-    target: postgresTarget,
+    target: { ...postgresTarget, collectionScopes: () => [postgresFullTextScope] },
     adapter: postgresAdapter,
     driver: postgresDriver,
     extensions: options.extensions ?? [],
