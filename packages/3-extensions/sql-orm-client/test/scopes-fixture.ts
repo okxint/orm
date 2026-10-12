@@ -111,6 +111,13 @@ export type TrigramContract = Override<
       readonly unique: false;
       readonly type: 'test/trigram';
     },
+    {
+      readonly name: 'first_00000000';
+      readonly prefix: 'first';
+      readonly columns: readonly ['views'];
+      readonly unique: false;
+      readonly type: 'test/trigram';
+    },
   ]
 > &
   Contract<SqlStorage>;
@@ -121,6 +128,13 @@ export function trigramContract(): TrigramContract {
     name: 'posts_title_trgm_00000000',
     prefix: 'posts_title_trgm',
     columns: ['title'],
+    unique: false,
+    type: 'test/trigram',
+  });
+  raw.storage.namespaces.public.entries.table.posts.indexes.push({
+    name: 'first_00000000',
+    prefix: 'first',
+    columns: ['views'],
     unique: false,
     type: 'test/trigram',
   });

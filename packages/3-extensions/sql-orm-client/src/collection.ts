@@ -156,7 +156,11 @@ import {
   mergeAnnotations,
 } from './query-plan';
 import { queryPlanRows } from './query-plan-rows';
-import { type CollectionScopes, createCollectionScopes } from './scopes';
+import {
+  type CollectionScopes,
+  createCollectionScopes,
+  type DirectCollectionScopes,
+} from './scopes';
 import {
   type AggregateBuilder,
   type AggregateIncludeReducers,
@@ -403,6 +407,7 @@ export class CollectionBase<
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
     this.includeRefinementMode = options.includeRefinementMode ?? false;
     this.#installAggregateReducers();
+    this.#installDirectScopes();
   }
 
   /**
@@ -552,6 +557,23 @@ export class CollectionBase<
         this.#callbackTools().indexes,
       ),
     );
+  }
+
+  #installDirectScopes(): void {
+    const contributions = this.ctx.context.collectionScopes ?? [];
+    if (contributions.length === 0) return;
+    const scopes = createCollectionScopes(
+      blindCast<CollectionScopeReceiver, 'a collection has where and orderBy'>(this),
+      contributions,
+      this.#callbackTools().indexes,
+    );
+    for (const name of Object.keys(scopes)) {
+      if (name in this) continue;
+      Object.defineProperty(this, name, {
+        value: scopes[name],
+        enumerable: false,
+      });
+    }
   }
 
   #callbackTools(): ModelCallbackTools<TContract, ModelName, State['nsId']> {
@@ -3396,7 +3418,22 @@ export type Collection<
   Row = SimplifyDeep<InferRootRow<TContract, ModelName>>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
 > = CollectionBase<TContract, ModelName, Row, State> &
-  AggregateIncludeReducers<TContract, ModelName, State['nsId']>;
+  AggregateIncludeReducers<TContract, ModelName, State['nsId']> &
+  DirectCollectionScopes<
+    TContract,
+    ModelName,
+    State['nsId'],
+    | ReservedCollectionMemberName
+    | keyof AggregateIncludeReducers<TContract, ModelName, State['nsId']>
+  >;
+
+/** Every member name of the base collection class. A scope with one of these names is reached only through `scopes`. */
+type ReservedCollectionMemberName = keyof CollectionBase<
+  Contract<SqlStorage>,
+  string,
+  unknown,
+  DefaultCollectionTypeState
+>;
 
 /**
  * The constructor face of {@link Collection}: constructing — or subclassing,

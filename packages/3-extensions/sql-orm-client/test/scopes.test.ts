@@ -90,6 +90,20 @@ describe('collection scopes', () => {
     expect(sql).toContain('ORDER BY ts_rank(');
   });
 
+  it('are placed directly on the collection when the name is free', () => {
+    const direct = plain.User.select('id').users_search(q);
+    const viaScopes = plain.User.select('id').scopes.users_search(q);
+
+    expect(usersSql(direct.state)).toBe(usersSql(viaScopes.state));
+    expect(usersSql(db.User.relevantDirect(q).state)).toBe(usersSql(db.User.relevant(q).state));
+  });
+
+  it('leave a name a collection member holds to the member', () => {
+    expect(trigram.Post.first).toBe(trigram.Post.first);
+    expect(typeof trigram.Post.scopes.first).toBe('function');
+    expect(Object.hasOwn(trigram.Post, 'first')).toBe(false);
+  });
+
   it('come from a second index type the ORM client does not know', () => {
     const posts = trigram.Post.select('id').scopes.posts_title_trgm('title', 'zebra');
     const withTrigram = trigramContract();

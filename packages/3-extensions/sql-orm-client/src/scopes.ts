@@ -55,11 +55,13 @@ export type ModelScopeTable<
   ModelName extends string,
   NsId extends string,
   Refs = ModelIndexReferences<TContract, ModelName, NsId>,
-> = {
-  readonly [Name in keyof Refs as [MatchingKinds<Refs[Name]>] extends [never]
-    ? never
-    : Name]: ParametersOf<Refs[Name]>;
-};
+> = string extends keyof Refs
+  ? Record<never, never>
+  : {
+      readonly [Name in keyof Refs as [MatchingKinds<Refs[Name]>] extends [never]
+        ? never
+        : Name]: ParametersOf<Refs[Name]>;
+    };
 
 /** The scopes of a model's collection `Self`: one per index of the model's table that a registered kind matches. */
 export type CollectionScopes<
@@ -70,6 +72,22 @@ export type CollectionScopes<
   Table = ModelScopeTable<TContract, ModelName, NsId>,
 > = {
   readonly [Name in keyof Table]: ScopeOperation<Table[Name], Self>;
+};
+
+/**
+ * The scopes of a model placed directly on its collection, each under the index's name, when no member of the collection's base class or aggregate reducer has that name. Each is a method generic over its receiver, so it keeps a custom class, the row type and earlier facts.
+ */
+export type DirectCollectionScopes<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string,
+  Reserved extends PropertyKey,
+  Table = ModelScopeTable<TContract, ModelName, NsId>,
+> = {
+  readonly [Name in Exclude<keyof Table, Reserved>]: <Self>(
+    this: Self,
+    ...args: Extract<Table[Name], readonly unknown[]>
+  ) => ScopeResult<Self>;
 };
 
 function readableIndexes(

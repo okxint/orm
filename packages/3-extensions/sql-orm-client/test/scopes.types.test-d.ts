@@ -1,6 +1,8 @@
 import { websearchToTsquery } from '@internal/target-postgres/full-text';
 import { describe, expectTypeOf, test } from 'vitest';
+import { Collection } from '../src/collection';
 import type { CollectionRowOf, HasOrderBy, HasWhere } from '../src/collection-types';
+import type { TestContract } from './helpers';
 import { createScopesOrm, type ScopedUserCollection } from './scopes-orm-fixture';
 
 const { db, plain, trigram } = createScopesOrm();
@@ -77,5 +79,48 @@ describe('a second index type', () => {
   test('reads the literal index data', () => {
     // @ts-expect-error `body` is not a column of the index
     trigram.Post.scopes.posts_title_trgm('body', 'x');
+  });
+});
+
+describe('direct placement', () => {
+  test('places a scope on the collection under the index name', () => {
+    const result = plain.User.users_search(q);
+    expectTypeOf(result).not.toBeAny();
+    expectTypeOf(result).toExtend<HasWhere & HasOrderBy>();
+  });
+
+  test('keeps a custom collection class, after where and limit', () => {
+    const result = db.User.named('a').limit(5).users_search(q);
+    expectTypeOf(result).toExtend<ScopedUserCollection & HasWhere & HasOrderBy>();
+    expectTypeOf(result.named('b')).toExtend<ScopedUserCollection>();
+  });
+
+  test('keeps the row type chosen before the call', () => {
+    const result = plain.User.select('id').users_search(q);
+    expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: number }>();
+  });
+
+  test('is offered inside an include refinement and on this in a custom method', () => {
+    expectTypeOf(
+      plain.User.include('invitedUsers', (invited) => invited.users_search(q).limit(3)),
+    ).not.toBeAny();
+    expectTypeOf(db.User.relevantDirect(q)).toExtend<
+      ScopedUserCollection & HasWhere & HasOrderBy
+    >();
+  });
+
+  test('leaves a name a collection member holds to the member', () => {
+    expectTypeOf(trigram.Post.scopes.first('views', 'x')).toExtend<HasWhere & HasOrderBy>();
+    expectTypeOf(trigram.Post.first).returns.toExtend<Promise<unknown>>();
+  });
+
+  test('a custom class method with a scope name and another signature does not compile', () => {
+    class Clashing extends Collection<TestContract, 'User'> {
+      // @ts-expect-error TS2416: the method is not assignable to the direct scope of the base type
+      users_search() {
+        return 'not a scope';
+      }
+    }
+    expectTypeOf(Clashing).not.toBeAny();
   });
 });

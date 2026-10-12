@@ -52,3 +52,16 @@ describe('scopes from the Postgres facade, through built output', () => {
     plain.Post.scopes.search(q);
   });
 });
+
+describe('direct placement, through built output', () => {
+  test('a scope is placed on the collection under the index name', () => {
+    const result = custom.Post.forUser('u').post_search(q);
+    expectTypeOf(result).toExtend<PostCollection & HasWhere & HasOrderBy>();
+    expectTypeOf(plain.Post.select('id').post_title_search(q)).not.toBeAny();
+  });
+
+  test('a model with no full-text index has no direct scope', () => {
+    // @ts-expect-error User has no full-text index
+    plain.User.post_search(q);
+  });
+});
