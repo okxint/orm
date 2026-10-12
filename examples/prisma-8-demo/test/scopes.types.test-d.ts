@@ -30,38 +30,39 @@ describe('scopes from the Postgres facade, through built output', () => {
   });
 
   test('a scope operation keeps the receiver and adds the filter and order facts', () => {
-    const result = custom.Post.forUser('u').scopes.post_search(q);
+    const result = custom.Post.forUser('u').scopes.post_search.fulltext(q);
     expectTypeOf(result).toExtend<PostCollection & HasWhere & HasOrderBy>();
     expectTypeOf(result.newestFirst()).toExtend<PostCollection>();
   });
 
   test('the row type chosen before the call is kept', () => {
-    const result = plain.Post.select('id', 'title').scopes.post_search(q);
+    const result = plain.Post.select('id', 'title').scopes.post_search.fulltext(q);
     expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: string; title: string }>();
   });
 
   test('a scope is offered inside an include refinement', () => {
     const result = plain.User.include('posts', (posts) =>
-      posts.scopes.post_title_search(q).limit(3),
+      posts.scopes.post_title_search.fulltext(q).limit(3),
     );
     expectTypeOf(result).not.toBeAny();
   });
 
   test('a wrong scope name is an error', () => {
     // @ts-expect-error no index is named `search`
-    plain.Post.scopes.search(q);
+    plain.Post.scopes.search.fulltext(q);
   });
 });
 
 describe('direct placement, through built output', () => {
-  test('a scope is placed on the collection under the index name', () => {
-    const result = custom.Post.forUser('u').post_search(q);
-    expectTypeOf(result).toExtend<PostCollection & HasWhere & HasOrderBy>();
-    expectTypeOf(plain.Post.select('id').post_title_search(q)).not.toBeAny();
+  test('a scope is placed on the collection, but its operation returns the model collection type', () => {
+    const result = custom.Post.forUser('u').post_search.fulltext(q);
+    expectTypeOf(result).toExtend<HasWhere & HasOrderBy>();
+    expectTypeOf(result).not.toExtend<PostCollection>();
+    expectTypeOf(plain.Post.select('id').post_title_search.fulltext(q)).not.toBeAny();
   });
 
   test('a model with no full-text index has no direct scope', () => {
     // @ts-expect-error User has no full-text index
-    plain.User.post_search(q);
+    plain.User.post_search.fulltext(q);
   });
 });

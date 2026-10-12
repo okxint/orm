@@ -12,7 +12,7 @@ describe('a scope', () => {
   test('exists under the authored name of an index a registered kind matches', () => {
     expectTypeOf(plain.User.scopes).not.toBeAny();
     expectTypeOf(plain.User.scopes).toHaveProperty('users_search');
-    expectTypeOf(plain.User.scopes.users_search).toBeFunction();
+    expectTypeOf(plain.User.scopes.users_search).toHaveProperty('fulltext');
   });
 
   test('is not offered under the physical name of an index', () => {
@@ -28,37 +28,37 @@ describe('a scope', () => {
 
   test('rejects an argument of the wrong type', () => {
     // @ts-expect-error a full-text scope takes a tsquery
-    plain.User.scopes.users_search('alice');
+    plain.User.scopes.users_search.fulltext('alice');
   });
 });
 
 describe('a scope operation', () => {
   test('returns the collection it was called on, filtered and ordered', () => {
-    const result = plain.User.scopes.users_search(q);
+    const result = plain.User.scopes.users_search.fulltext(q);
     expectTypeOf(result).not.toBeAny();
     expectTypeOf(result).toExtend<HasWhere & HasOrderBy>();
     expectTypeOf(result.limit(3).all).toBeFunction();
   });
 
   test('keeps a custom collection class', () => {
-    const result = db.User.scopes.users_search(q);
+    const result = db.User.scopes.users_search.fulltext(q);
     expectTypeOf(result).toExtend<ScopedUserCollection>();
     expectTypeOf(result.named('a').relevant(q)).toExtend<ScopedUserCollection>();
   });
 
   test('keeps the row type chosen before the call', () => {
-    const result = plain.User.select('id').scopes.users_search(q);
+    const result = plain.User.select('id').scopes.users_search.fulltext(q);
     expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: number }>();
   });
 
   test('is offered after where and limit', () => {
-    const result = db.User.named('a').limit(5).scopes.users_search(q);
+    const result = db.User.named('a').limit(5).scopes.users_search.fulltext(q);
     expectTypeOf(result).toExtend<ScopedUserCollection & HasWhere & HasOrderBy>();
   });
 
   test('is offered inside an include refinement', () => {
     const result = plain.User.include('invitedUsers', (invited) =>
-      invited.scopes.users_search(q).limit(3),
+      invited.scopes.users_search.fulltext(q).limit(3),
     );
     expectTypeOf(result).not.toBeAny();
   });
@@ -71,50 +71,52 @@ describe('a scope operation', () => {
 describe('a second index type', () => {
   test('contributes its own scope without a change to the ORM client', () => {
     expectTypeOf(trigram.Post.scopes).toHaveProperty('posts_title_trgm');
-    expectTypeOf(trigram.Post.scopes.posts_title_trgm('title', 'x')).toExtend<
+    expectTypeOf(trigram.Post.scopes.posts_title_trgm.similar('title', 'x')).toExtend<
       HasWhere & HasOrderBy
     >();
   });
 
   test('reads the literal index data', () => {
     // @ts-expect-error `body` is not a column of the index
-    trigram.Post.scopes.posts_title_trgm('body', 'x');
+    trigram.Post.scopes.posts_title_trgm.similar('body', 'x');
   });
 });
 
 describe('direct placement', () => {
   test('places a scope on the collection under the index name', () => {
-    const result = plain.User.users_search(q);
+    const result = plain.User.users_search.fulltext(q);
     expectTypeOf(result).not.toBeAny();
     expectTypeOf(result).toExtend<HasWhere & HasOrderBy>();
   });
 
-  test('keeps a custom collection class, after where and limit', () => {
-    const result = db.User.named('a').limit(5).users_search(q);
-    expectTypeOf(result).toExtend<ScopedUserCollection & HasWhere & HasOrderBy>();
-    expectTypeOf(result.named('b')).toExtend<ScopedUserCollection>();
+  test('loses a custom collection class: the operation returns the model collection type', () => {
+    const result = db.User.named('a').limit(5).users_search.fulltext(q);
+    expectTypeOf(result).not.toExtend<ScopedUserCollection>();
+    expectTypeOf(db.User.relevantDirect(q)).not.toExtend<ScopedUserCollection>();
   });
 
-  test('keeps the row type chosen before the call', () => {
-    const result = plain.User.select('id').users_search(q);
+  test('keeps the row type chosen by select, which returns a new collection type', () => {
+    const result = plain.User.select('id').users_search.fulltext(q);
     expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: number }>();
   });
 
-  test('is offered inside an include refinement and on this in a custom method', () => {
+  test('loses the row type an include added', () => {
+    const result = plain.User.select('id').include('invitedUsers').users_search.fulltext(q);
+    expectTypeOf<CollectionRowOf<typeof result>>().toEqualTypeOf<{ id: number }>();
+  });
+
+  test('is offered inside an include refinement', () => {
     expectTypeOf(
-      plain.User.include('invitedUsers', (invited) => invited.users_search(q).limit(3)),
+      plain.User.include('invitedUsers', (invited) => invited.users_search.fulltext(q).limit(3)),
     ).not.toBeAny();
-    expectTypeOf(db.User.relevantDirect(q)).toExtend<
-      ScopedUserCollection & HasWhere & HasOrderBy
-    >();
   });
 
   test('leaves a name a collection member holds to the member', () => {
-    expectTypeOf(trigram.Post.scopes.first('views', 'x')).toExtend<HasWhere & HasOrderBy>();
+    expectTypeOf(trigram.Post.scopes.first.similar('views', 'x')).toExtend<HasWhere & HasOrderBy>();
     expectTypeOf(trigram.Post.first).returns.toExtend<Promise<unknown>>();
   });
 
-  test('a custom class method with a scope name and another signature does not compile', () => {
+  test('a custom class member with a scope name and another type does not compile', () => {
     class Clashing extends Collection<TestContract, 'User'> {
       // @ts-expect-error TS2416: the method is not assignable to the direct scope of the base type
       users_search() {

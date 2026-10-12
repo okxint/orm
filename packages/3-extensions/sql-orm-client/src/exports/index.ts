@@ -37,7 +37,7 @@ export type {
   CollectionScopeKind,
   CollectionScopeRegistry,
   CollectionScopes,
-  ScopeOperation,
+  ScopeOperations,
   ScopeResult,
 } from '../scopes';
 export type {

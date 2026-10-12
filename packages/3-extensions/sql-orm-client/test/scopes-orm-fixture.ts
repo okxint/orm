@@ -9,11 +9,11 @@ export class ScopedUserCollection extends Collection<TestContract, 'User'> {
   }
 
   relevant(query: Tsquery) {
-    return this.scopes.users_search(query);
+    return this.scopes.users_search.fulltext(query);
   }
 
   relevantDirect(query: Tsquery) {
-    return this.users_search(query);
+    return this.users_search.fulltext(query);
   }
 }
 

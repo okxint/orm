@@ -15,20 +15,20 @@ const q = websearchToTsquery('zebra');
 
 export class SearchPosts extends Collection<Contract, 'Post'> {
   search() {
-    return this.post_search(q);
+    return this.post_search.fulltext(q);
   }
 }
 
-export const use1 = plain.Post.post_search(q);
-export const use2 = db.Post.post_search(q);
-export const use3 = plain.Post.where({ title: 'a' }).post_search(q);
-export const use4 = plain.Post.limit(3).post_title_search(q);
-export const use5 = plain.Post.select('id').post_search(q);
-export const use6 = plain.User.include('posts', (posts) => posts.post_search(q));
+export const use1 = plain.Post.post_search.fulltext(q);
+export const use2 = db.Post.post_search.fulltext(q);
+export const use3 = plain.Post.where({ title: 'a' }).post_search.fulltext(q);
+export const use4 = plain.Post.limit(3).post_title_search.fulltext(q);
+export const use5 = plain.Post.select('id').post_search.fulltext(q);
+export const use6 = plain.User.include('posts', (posts) => posts.post_search.fulltext(q));
 export const use7 = SearchPosts;
-export const use8 = plain.Post.orderBy((p) => p.id.asc()).post_search(q);
-export const use9 = plain.Post.with((posts) => posts.post_title_search(q));
-export const use10 = db.Post.forUser('u').post_search(q).newestFirst();
+export const use8 = plain.Post.orderBy((p) => p.id.asc()).post_search.fulltext(q);
+export const use9 = plain.Post.with((posts) => posts.post_title_search.fulltext(q));
+export const use10 = db.Post.forUser('u').post_search.fulltext(q).limit(2);
 
 test('ten uses of a scope, one per site, type-check', () => {
   expectTypeOf(use1).not.toBeAny();

@@ -8,10 +8,10 @@ import { blindCast } from '@internal/utils/casts';
 
 type Tsquery = Expression<{ readonly codecId: 'pg/tsquery@1'; readonly nullable: false }>;
 
-/** The full-text scope kind: each full-text index of a model's table is a scope that searches it. */
+/** The full-text scope kind: each full-text index of a model's table is a scope with a `fulltext` operation. */
 export interface PostgresFullTextScope extends CollectionScopeKind {
   readonly match: { readonly type: 'fullText' };
-  readonly parameters: readonly [query: Tsquery];
+  readonly operations: { readonly fulltext: readonly [query: Tsquery] };
 }
 
 declare module '@internal/sql-orm-client' {
@@ -29,14 +29,16 @@ function indexFunction(tools: CollectionScopeTools, name: string): IndexFunction
 export const postgresFullTextScope: SqlCollectionScopeContribution = {
   id: 'postgres/fullText',
   matches: (index) => index.type === 'fullText',
-  operation: (collection, indexName, ...args) => {
-    const [query] = blindCast<[Tsquery], 'the operation is typed by PostgresFullTextScope'>(args);
-    return collection
-      .where((_model, tools) =>
-        indexFunction(tools, 'fullTextMatches')(tools.indexes[indexName], query),
-      )
-      .orderBy((_model, tools) =>
-        indexFunction(tools, 'fullTextRank')(tools.indexes[indexName], query).desc(),
-      );
+  operations: {
+    fulltext: (collection, indexName, ...args) => {
+      const [query] = blindCast<[Tsquery], 'the operation is typed by PostgresFullTextScope'>(args);
+      return collection
+        .where((_model, tools) =>
+          indexFunction(tools, 'fullTextMatches')(tools.indexes[indexName], query),
+        )
+        .orderBy((_model, tools) =>
+          indexFunction(tools, 'fullTextRank')(tools.indexes[indexName], query).desc(),
+        );
+    },
   },
 };

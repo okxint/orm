@@ -3422,7 +3422,8 @@ export type Collection<
   DirectCollectionScopes<
     TContract,
     ModelName,
-    State['nsId'],
+    Row,
+    State,
     | ReservedCollectionMemberName
     | keyof AggregateIncludeReducers<TContract, ModelName, State['nsId']>
   >;
