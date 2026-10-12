@@ -54,9 +54,21 @@ type OperationsOf<Ref> = UnionToIntersection<
 export type ScopeResult<Self> = Ordered<Filtered<Self>>;
 
 export type ScopeOperations<Operations, Self> = {
-  readonly [Op in keyof Operations]: (
+  readonly [Op in keyof Operations]: <Receiver = Self>(
     ...args: Extract<Operations[Op], readonly unknown[]>
-  ) => ScopeResult<Self>;
+  ) => ScopeResult<Receiver>;
+};
+
+/** Each scope of a model, by name, with each operation's parameter list. It does not depend on the receiver, so TypeScript computes it once per model. */
+export type ModelScopeTable<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string,
+  Refs = ModelIndexReferences<TContract, ModelName, NsId>,
+> = {
+  readonly [Name in keyof Refs as [MatchingKinds<Refs[Name]>] extends [never]
+    ? never
+    : Name]: OperationsOf<Refs[Name]>;
 };
 
 /** The scopes of a model's collection `Self`: one per index of the model's table that a registered kind matches. */
@@ -65,11 +77,9 @@ export type CollectionScopes<
   ModelName extends string,
   NsId extends string,
   Self,
-  Refs = ModelIndexReferences<TContract, ModelName, NsId>,
+  Table = ModelScopeTable<TContract, ModelName, NsId>,
 > = {
-  readonly [Name in keyof Refs as [MatchingKinds<Refs[Name]>] extends [never]
-    ? never
-    : Name]: ScopeOperations<OperationsOf<Refs[Name]>, Self>;
+  readonly [Name in keyof Table]: ScopeOperations<Table[Name], Self>;
 };
 
 function readableIndexes(
