@@ -54,7 +54,7 @@ type OperationsOf<Ref> = UnionToIntersection<
 export type ScopeResult<Self> = Ordered<Filtered<Self>>;
 
 export type ScopeOperations<Operations, Self> = {
-  readonly [Op in keyof Operations]: <Receiver = Self>(
+  readonly [Op in keyof Operations]: <Receiver extends Self = Self>(
     ...args: Extract<Operations[Op], readonly unknown[]>
   ) => ScopeResult<Receiver>;
 };
