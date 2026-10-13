@@ -1,9 +1,11 @@
+import type { StorageTable } from '@internal/sql-contract/types';
 import type {
+  CollectionMethodModelView,
   CollectionMethodReceiver,
   CollectionMethodTools,
 } from '@internal/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import { postgresFullTextMethod } from '../src/core/full-text-collection-method';
+import { postgresFullTextMethods } from '../src/core/full-text-collection-method';
 import postgresRuntimeTargetDescriptor from '../src/exports/runtime';
 
 function recordingReceiver(tools: CollectionMethodTools) {
@@ -21,17 +23,33 @@ function recordingReceiver(tools: CollectionMethodTools) {
   return { receiver, calls };
 }
 
-describe('the Postgres full-text collection method', () => {
-  it('is contributed by the runtime target descriptor', () => {
-    expect(postgresRuntimeTargetDescriptor.collectionMethods()).toEqual([postgresFullTextMethod]);
+function model(target: string, indexes: StorageTable['indexes']): CollectionMethodModelView {
+  return {
+    target,
+    name: 'Post',
+    fields: {},
+    relations: {},
+    table: { columns: {}, indexes, uniques: [], foreignKeys: [] } as unknown as StorageTable,
+  };
+}
+
+const indexes = [
+  { name: 'post_search_1', prefix: 'post_search', columns: ['title'], type: 'fullText' },
+  { name: 'post_title', columns: ['title'] },
+  { name: 'shared_a', prefix: 'shared', columns: ['title'], type: 'fullText' },
+  { name: 'shared_b', prefix: 'shared', columns: ['body'], type: 'fullText' },
+] as unknown as StorageTable['indexes'];
+
+describe('the Postgres full-text collection methods', () => {
+  it('are contributed by the runtime target descriptor', () => {
+    expect(postgresRuntimeTargetDescriptor.collectionMethods()).toEqual([postgresFullTextMethods]);
   });
 
-  it('matches full-text indexes only', () => {
+  it('name one method after each full-text index whose authored name is its own, for Postgres only', () => {
     expect({
-      fullText: postgresFullTextMethod.matches({ name: 'a', type: 'fullText' }),
-      btree: postgresFullTextMethod.matches({ name: 'b' }),
-      other: postgresFullTextMethod.matches({ name: 'c', type: 'gin' }),
-    }).toEqual({ fullText: true, btree: false, other: false });
+      postgres: Object.keys(postgresFullTextMethods.methodsFor(model('postgres', indexes))),
+      other: Object.keys(postgresFullTextMethods.methodsFor(model('other', indexes))),
+    }).toEqual({ postgres: ['post_search'], other: [] });
   });
 
   it('filters with fullTextMatches and then orders by fullTextRank, descending', () => {
@@ -44,8 +62,9 @@ describe('the Postgres full-text collection method', () => {
       },
     };
     const { receiver, calls } = recordingReceiver(tools);
+    const method = postgresFullTextMethods.methodsFor(model('postgres', indexes))['post_search'];
 
-    const result = postgresFullTextMethod.method(receiver, 'post_search', 'q' as never);
+    const result = method?.(receiver, 'q' as never);
 
     expect({ result, calls }).toEqual({
       result: receiver,

@@ -142,8 +142,7 @@ describe('createExecutionContext', () => {
   it('collects the collection methods the target and extensions contribute, in stack order', () => {
     const method = (id: string): CollectionMethodContribution => ({
       id,
-      matches: () => false,
-      method: (collection) => collection,
+      methodsFor: () => ({}),
     });
     const extension = (id: string): SqlRuntimeExtensionDescriptor<'postgres'> => ({
       ...createTestExtensionDescriptor({ hasCodecs: false, hasOperations: false }),

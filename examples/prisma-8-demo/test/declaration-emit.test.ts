@@ -126,15 +126,25 @@ function checkAlone(options: ts.CompilerOptions, source: string) {
   return messages(ts.getPreEmitDiagnostics(program, program.getSourceFile(source)));
 }
 
-describe('contributed collection methods in a program that imports only the ORM client and the contract', () => {
+describe('contributed collection methods in a program of its own', () => {
   it(
-    'types using.post_search through the contract types alone',
+    'are absent when the program imports only the ORM client and the contract types',
     () => {
       expect(
         checkAlone(
           demoCompilerOptions(),
-          resolve(demoRoot, 'test/fixtures/contract-only-library.ts'),
+          resolve(demoRoot, 'isolated-programs/contract-only-library.ts'),
         ),
+      ).toEqual([]);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'are present when the program imports the Postgres facade and pgvector',
+    () => {
+      expect(
+        checkAlone(demoCompilerOptions(), resolve(demoRoot, 'isolated-programs/facade-library.ts')),
       ).toEqual([]);
     },
     timeouts.typeScriptCompilation,

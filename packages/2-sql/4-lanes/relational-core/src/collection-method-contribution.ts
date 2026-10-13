@@ -1,26 +1,33 @@
-import type { Index } from '@internal/sql-contract/types';
+import type { ContractField, ContractRelation } from '@internal/contract/types';
+import type { StorageTable } from '@internal/sql-contract/types';
 import type { IndexReference } from './index-reference';
 
 /**
- * The type half of a collection method a package contributes. An index whose reference is assignable to `match`, in a contract whose `target` is assignable to `target` when one is given, gets the method. `index` is filled with that index's reference, so `parameters` can read it. `parameters` is the method's parameter list; the ORM client decides what it returns.
+ * One model, as a contribution reads it: the contract's target, the model's name, its fields with their codec ids and type parameters, its relations, and its storage table with columns and indexes.
  */
-export interface CollectionMethodSignature {
-  readonly target?: string;
-  readonly match: unknown;
-  readonly index: unknown;
-  readonly parameters: readonly unknown[];
+export interface CollectionMethodModel {
+  readonly target: string;
+  readonly name: string;
+  readonly fields: object;
+  readonly relations: object;
+  readonly table: { readonly columns: object; readonly indexes: readonly unknown[] };
 }
 
 /**
- * The type halves of the contributed collection methods, keyed by the id of their run-time half. A package that owns an index type adds its signature by declaration merging.
+ * The type half of a package's collection methods. The ORM client fills `model` with one model's `CollectionMethodModel` and reads `methods` back: an object type whose keys are method names and whose values are parameter lists. An entry computes `methods` from `this['model']`.
+ */
+export interface CollectionMethodsEntry {
+  readonly model: CollectionMethodModel;
+  readonly methods: object;
+}
+
+/**
+ * The type halves of the contributed collection methods, keyed by the id of their run-time half. A package adds its entry by declaration merging, in a module the package's own entry point loads.
  */
 export interface CollectionMethodRegistry {
   /** Keeps the interface from being empty, which would make it a type alias that cannot be merged. */
   readonly __collectionMethodRegistry?: never;
 }
-
-/** An index of the contract, as a contribution's `matches` reads it. */
-export type CollectionMethodIndex = Pick<Index, 'name' | 'type' | 'options'>;
 
 /** The second argument of an ORM `where` or `orderBy` callback, as a contributed method reads it. */
 export interface CollectionMethodTools {
@@ -38,19 +45,25 @@ export interface CollectionMethodReceiver {
   ): CollectionMethodReceiver;
 }
 
-/** A contributed method's body: refines `collection` using the index named `indexName`. */
+/** A contributed method's body: refines `collection` with the method's arguments. */
 export type CollectionMethodBody = (
   collection: CollectionMethodReceiver,
-  indexName: string,
   ...args: never[]
 ) => CollectionMethodReceiver;
 
+/** One model, as a contribution's run-time half reads it. */
+export interface CollectionMethodModelView {
+  readonly target: string;
+  readonly name: string;
+  readonly fields: Readonly<Record<string, ContractField>>;
+  readonly relations: Readonly<Record<string, ContractRelation>>;
+  readonly table: StorageTable;
+}
+
 /**
- * The run-time half of a collection method a package contributes for the indexes it `matches`, in contracts of `target` when one is given. `id` is the key its type half registers under in `CollectionMethodRegistry`.
+ * The run-time half of a package's collection methods. `methodsFor` returns one model's methods by name; the ORM client calls it once for each model of the contract. `id` is the key its type half registers under in `CollectionMethodRegistry`.
  */
 export interface CollectionMethodContribution {
   readonly id: string;
-  readonly target?: string;
-  matches(index: CollectionMethodIndex): boolean;
-  readonly method: CollectionMethodBody;
+  methodsFor(model: CollectionMethodModelView): Readonly<Record<string, CollectionMethodBody>>;
 }

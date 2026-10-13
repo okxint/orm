@@ -13,7 +13,8 @@ import { createCollectionMethodsOrm } from './collection-methods-orm-fixture';
 const { plain } = createCollectionMethodsOrm();
 const q = websearchToTsquery('alice');
 plain.User.using.search(q);
-plain.Post.using.users_search(q);
+plain.Comment.using.users_search(q);
+plain.Tag.using.labelled('x');
 `;
 
 function fixtureDiagnostics(): string[] {
@@ -43,15 +44,14 @@ function fixtureDiagnostics(): string[] {
   ].map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 }
 
-describe('a missing collection method', () => {
-  it('is reported as a property missing from CollectionMethods of the model', () => {
-    const diagnostics = fixtureDiagnostics();
-    expect(diagnostics).toHaveLength(2);
-    expect(diagnostics[0]).toMatch(
-      /^Property 'search' does not exist on type 'CollectionMethods<Contract, "User", "public", /,
-    );
-    expect(diagnostics[1]).toMatch(
-      /^Property 'users_search' does not exist on type 'CollectionMethods<Contract, "Post", "public", /,
-    );
+describe('the errors for collection methods', () => {
+  it('name the model for a missing method, and the model and contributions for a clash', () => {
+    const collection = (model: string) =>
+      `Collection<Contract, "${model}", DefaultModelRow<Contract, "${model}", "public">, WithNsId<DefaultCollectionTypeState, "public">>`;
+    expect(fixtureDiagnostics()).toEqual([
+      `Property 'search' does not exist on type 'CollectionMethods<Contract, "User", "public", ${collection('User')}, MergedTable<...>>'.`,
+      `Property 'users_search' does not exist on type 'CollectionMethods<Contract, "Comment", "public", ${collection('Comment')}, MergedTable<...>>'.`,
+      `This expression is not callable.\n  Type 'CollectionMethodNameClash<"labelled", "Tag", "test/clash-a" | "test/clash-b">' has no call signatures.`,
+    ]);
   });
 });

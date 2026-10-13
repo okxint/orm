@@ -86,7 +86,7 @@ import type {
 } from './collection-internal-types';
 import {
   type CollectionMethods,
-  collectionMethodEntries,
+  collectionMethodTable,
   createCollectionMethods,
 } from './collection-methods';
 import {
@@ -579,20 +579,16 @@ export class CollectionBase<
   }
 
   /**
-   * The collection methods packages contribute for this model's indexes: one for each index of the model's table that a contribution matches, named as the index is named. Each returns this collection with the method's filter and order added.
+   * The collection methods packages contribute for this model. Each contribution reads the model and names its methods. Each method returns this collection with the method's filter and order added.
    */
   get using(): CollectionMethods<TContract, ModelName, State['nsId'], this> {
     return blindCast<
       CollectionMethods<TContract, ModelName, State['nsId'], this>,
-      'the run time offers a method for each index a contribution matches, as the type does for the registry'
+      'the run time offers the methods each contribution gives this model, as the type does for the registry'
     >(
       createCollectionMethods(
         blindCast<CollectionMethodReceiver, 'a collection has where and orderBy'>(this),
-        collectionMethodEntries(
-          this.ctx.context,
-          this.namespaceId,
-          resolveModelTableName(this.contract, this.namespaceId, this.modelName),
-        ),
+        collectionMethodTable(this.ctx.context, this.namespaceId, this.modelName),
       ),
     );
   }

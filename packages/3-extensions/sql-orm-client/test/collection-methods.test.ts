@@ -8,14 +8,14 @@ import type { CollectionMethodContribution } from '@internal/sql-relational-core
 import { websearchToTsquery } from '@internal/target-postgres/full-text';
 import { describe, expect, it } from 'vitest';
 import type { PostgresContract } from '../../../3-targets/6-adapters/postgres/src/core/types';
-import { collectionMethodEntries } from '../src/collection-methods';
+import { collectionMethodTable } from '../src/collection-methods';
 import { orm } from '../src/orm';
 import { compileSelect, compileSelectWithIncludes } from '../src/query-plan-select';
 import type { CollectionState } from '../src/types';
 import {
-  notesContract,
-  otherTargetFullTextMethod,
-  testTrigramMethod,
+  contextWithClash,
+  testAsOfMethods,
+  testClosestMethods,
 } from './collection-methods-fixture';
 import { createCollectionMethodsOrm } from './collection-methods-orm-fixture';
 import { createMockRuntime, getTestAggregates, getTestContext, getTestContract } from './helpers';
@@ -39,30 +39,32 @@ const search = `(setweight(to_tsvector('english', coalesce("users"."name", '')),
 const q = websearchToTsquery('alice');
 
 describe('using', () => {
-  const { plain, notes, unlisted } = createCollectionMethodsOrm();
+  const { plain, notes, extended } = createCollectionMethodsOrm();
 
-  it('has one method for each index a registered contribution matches', () => {
+  it('has the methods each registered contribution gives the model', () => {
     expect({
       user: Object.keys(plain.User.using),
       post: Object.keys(plain.Post.using),
       note: Object.keys(notes.Note.using),
-      memo: Object.keys(notes.Note.variant('memo').using),
       tag: Object.keys(notes.Tag.using),
-      unlisted: Object.keys(unlisted.User.using),
+      extendedUser: Object.keys(extended.User.using),
+      extendedPost: Object.keys(extended.Post.using),
+      extendedTag: Object.keys(extended.Tag.using),
     }).toEqual({
       user: ['users_search'],
       post: [],
-      note: ['notes_search', 'notes_title_trgm'],
-      memo: ['notes_search', 'notes_title_trgm'],
+      note: ['notes_search'],
       tag: [],
-      unlisted: ['users_search'],
+      extendedUser: ['users_search', 'as_of'],
+      extendedPost: ['embedding_closest'],
+      extendedTag: ['labelled'],
     });
   });
 
-  it('works out the methods of a table once per execution context', () => {
+  it('works out the methods of a model once per execution context', () => {
     const context = getTestContext();
-    expect(collectionMethodEntries(context, 'public', 'users')).toBe(
-      collectionMethodEntries(context, 'public', 'users'),
+    expect(collectionMethodTable(context, 'public', 'User')).toBe(
+      collectionMethodTable(context, 'public', 'User'),
     );
   });
 
@@ -81,7 +83,7 @@ describe('using', () => {
 });
 
 describe('a contributed method', () => {
-  const { db, plain, notes } = createCollectionMethodsOrm();
+  const { db, plain } = createCollectionMethodsOrm();
 
   it('filters by the index and orders by its relevance, binding the query once', () => {
     const users = plain.User.select('id').using.users_search(q);
@@ -163,12 +165,12 @@ describe('a contributed method', () => {
     );
   });
 
-  it('comes from a second index type the ORM client does not know', () => {
-    const notesSchema = notesContract();
-    const found = notes.Note.select('id').using.notes_title_trgm('title', 'zebra');
+  it('comes from a contribution that names its method after a field', () => {
+    const { extended } = createCollectionMethodsOrm();
+    const found = extended.Post.select('id').using.embedding_closest([1, 2, 3]);
 
-    expect(sqlOf(notesSchema, compileSelect(notesSchema, 'Note', found.state))).toBe(
-      'SELECT "notes"."id" AS "id" FROM "public"."notes" WHERE "notes"."title" = $1 ORDER BY similarity("notes"."title", $2) DESC',
+    expect(sqlOf(contract, compileSelect(contract, 'Post', found.state))).toBe(
+      'SELECT "posts"."id" AS "id" FROM "public"."posts" ORDER BY "posts"."id" ASC',
     );
   });
 });
@@ -185,71 +187,49 @@ describe('the ORM client', () => {
         runtime,
         context: {
           ...context,
-          collectionMethods: [fullText, testTrigramMethod, testTrigramMethod],
+          collectionMethods: [fullText, testAsOfMethods, testAsOfMethods],
         },
       }),
     ).toThrow(
       expect.objectContaining({
         code: 'ORM.ARGUMENT_INVALID',
-        message: 'Two collection method contributions have the id "test/trigram".',
-        why: 'A contribution is registered under its id in CollectionMethodRegistry, so an id names one contribution.',
-        fix: 'List each extension once, or give one of the two contributions another id.',
-        meta: { id: 'test/trigram' },
+        message: 'Two collection method contributions have the id "test/as-of".',
+        meta: { id: 'test/as-of' },
       }),
     );
   });
 
-  it('refuses two contributions that match the same index', () => {
-    const otherFullText: CollectionMethodContribution = {
-      ...fullText,
-      id: 'test/other-full-text',
-    };
-
-    expect(() =>
-      orm({ runtime, context: { ...context, collectionMethods: [fullText, otherFullText] } }),
-    ).toThrow(
+  it('refuses two contributions that give a model the same method name, at construction', () => {
+    expect(() => orm({ runtime, context: contextWithClash() })).toThrow(
       expect.objectContaining({
         code: 'ORM.ARGUMENT_INVALID',
         message:
-          'Index "users_search" of table "users" is matched by more than one collection method contribution: "postgres/fullText", "test/other-full-text".',
-        why: 'An index gets one collection method under `using`, named after the index, so only one contribution may match it.',
+          'Collection method "labelled" of model "Tag" is contributed by both "test/clash-a" and "test/clash-b".',
+        why: 'A collection offers one method under each name in `using`.',
         fix: 'Remove one of the extensions that contribute these methods.',
-        meta: {
-          namespaceId: 'public',
-          tableName: 'users',
-          index: 'users_search',
-          contributions: ['postgres/fullText', 'test/other-full-text'],
-        },
+        meta: { model: 'Tag', method: 'labelled', contributions: ['test/clash-a', 'test/clash-b'] },
       }),
     );
   });
 
-  it('ignores a contribution for another target, so it neither adds a method nor collides', () => {
-    const client = orm({
-      runtime,
-      context: { ...context, collectionMethods: [fullText, otherTargetFullTextMethod] },
-    });
-    expect(Object.keys(client.public.User.using)).toEqual(['users_search']);
-  });
-
-  it('checks a context for ambiguity once, however many clients use it', () => {
-    let calls = 0;
+  it('asks each contribution for each model once per context, however many clients use it', () => {
+    const asked: string[] = [];
     const counting: CollectionMethodContribution = {
       id: 'test/counting',
-      matches: () => {
-        calls += 1;
-        return false;
+      methodsFor: (model) => {
+        asked.push(model.name);
+        return {};
       },
-      method: (collection) => collection,
     };
-    const counted = { ...context, collectionMethods: [fullText, counting] };
+    const counted = { ...context, collectionMethods: [fullText, counting, testClosestMethods] };
 
+    const first = orm({ runtime, context: counted });
+    const afterFirst = [...asked];
     orm({ runtime, context: counted });
-    const afterFirst = calls;
-    orm({ runtime, context: counted });
+    void first.public.User.using;
 
-    expect({ checked: afterFirst > 0, afterSecond: calls }).toEqual({
-      checked: true,
+    expect({ once: new Set(afterFirst).size === afterFirst.length, afterSecond: asked }).toEqual({
+      once: true,
       afterSecond: afterFirst,
     });
   });

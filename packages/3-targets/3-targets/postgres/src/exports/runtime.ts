@@ -6,7 +6,7 @@ import type {
 import type { SqlOperationDescriptors } from '@internal/sql-operations';
 import type { CollectionMethodContribution } from '@internal/sql-relational-core/query-lane-context';
 import { postgresTargetDescriptorMetaRuntime } from '../core/descriptor-meta-runtime';
-import { postgresFullTextMethod } from '../core/full-text-collection-method';
+import { postgresFullTextMethods } from '../core/full-text-collection-method';
 import { decodePostgresListText } from '../core/list-decoder';
 import { postgresQueryOperations } from '../core/query-operations';
 
@@ -46,7 +46,7 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   codecs: () => [],
   listDecoder: () => decodePostgresListText,
   queryOperations: () => postgresQueryOperations(),
-  collectionMethods: () => [postgresFullTextMethod],
+  collectionMethods: () => [postgresFullTextMethods],
   create(): PostgresRuntimeTargetInstance {
     return {
       familyId: 'sql',

@@ -1,6 +1,7 @@
 export { Collection } from '../collection';
 export type {
   CollectionMethod,
+  CollectionMethodNameClash,
   CollectionMethodResult,
   CollectionMethods,
   ModelCollectionMethodTable,

@@ -1,3 +1,4 @@
+import '@prisma/orm-postgres/runtime';
 import type {
   AggregateResult,
   AggregateSelector,

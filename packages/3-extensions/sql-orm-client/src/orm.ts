@@ -7,7 +7,7 @@ import type {
 import { blindCast } from '@internal/utils/casts';
 import { aggregateOperationNames } from './aggregate-operations';
 import { type Collection, CollectionBase, reservedCollectionMemberNames } from './collection';
-import { assertCollectionMethodsUnambiguous } from './collection-methods';
+import { collectionMethodTables } from './collection-methods';
 import {
   type DeclaredFields,
   type DeclaredFieldsFragment,
@@ -171,7 +171,7 @@ export function orm<
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
   const { runtime, collections, context } = options;
   assertAggregateOperationsNotReserved(context.aggregateDescriptors);
-  assertCollectionMethodsUnambiguous(context);
+  collectionMethodTables(context);
   const contract = context.contract;
   const ctx: CollectionContext<TContract> = { runtime, context };
   const collectionRegistry = createCollectionRegistry(contract, collections);

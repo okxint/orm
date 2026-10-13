@@ -1,7 +1,7 @@
-import type { PostgresTsqueryArgument } from '@internal/target-postgres/operation-types';
+import type { PostgresTsqueryArgument } from '@internal/target-postgres/full-text';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
-import { contextWithTrigram, notesContext } from './collection-methods-fixture';
+import { contextWithTestMethods, notesContext } from './collection-methods-fixture';
 import { createMockRuntime, getTestContext, type TestContract } from './helpers';
 
 export class SearchableUserCollection extends Collection<TestContract, 'User'> {
@@ -20,13 +20,13 @@ export function createCollectionMethodsOrm() {
   const db = orm({ runtime, context, collections: { User: SearchableUserCollection } });
   const plain = orm({ runtime, context });
   const notes = orm({ runtime, context: notesContext() });
-  const unlisted = orm({ runtime, context: contextWithTrigram() });
+  const extended = orm({ runtime, context: contextWithTestMethods() });
   return {
     runtime,
     db: db.public,
     plain: plain.public,
     notes: notes.public,
-    unlisted: unlisted.public,
+    extended: extended.public,
     fragment: plain.fragment,
   };
 }
