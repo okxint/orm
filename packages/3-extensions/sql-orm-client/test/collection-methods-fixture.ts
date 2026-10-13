@@ -7,7 +7,9 @@ import type {
   ExecutionContext,
 } from '@internal/sql-relational-core/query-lane-context';
 import type { SqlRuntimeExtensionDescriptor } from '@internal/sql-runtime';
+import type { PostgresTsqueryArgument } from '@internal/target-postgres/full-text';
 import { PostgresContractSerializer } from '@internal/target-postgres/runtime';
+import type { CollectionMethodRule } from '../src/collection-method-rules';
 import type { Contract as NotesContract } from './fixtures/collection-methods/generated/contract';
 import notesContractJson from './fixtures/collection-methods/generated/contract.json' with {
   type: 'json',
@@ -68,6 +70,56 @@ export interface TestClashB extends CollectionMethodsEntry {
   readonly methods: this['model']['name'] extends 'Tag'
     ? { readonly labelled: readonly [label: string, exact: boolean] }
     : Record<never, never>;
+}
+
+interface FullTextRule extends CollectionMethodRule {
+  readonly per: 'index';
+  readonly match: { readonly type: 'fullText' };
+  readonly prefix: '';
+  readonly suffix: '';
+  readonly parameters: readonly [query: PostgresTsqueryArgument];
+}
+
+interface ClosestRule extends CollectionMethodRule {
+  readonly per: 'field';
+  readonly match: { readonly type: { readonly codecId: 'pg/vector@1' } };
+  readonly prefix: '';
+  readonly suffix: '_closest';
+  readonly parameters: readonly [vector: TestVector<LengthOf<this['subject']>>];
+}
+
+interface AsOfRule extends CollectionMethodRule {
+  readonly per: 'model';
+  readonly match: { readonly name: 'User' };
+  readonly prefix: 'as_of';
+  readonly suffix: '';
+  readonly parameters: readonly [at: Date];
+}
+
+interface ClashRuleA extends CollectionMethodRule {
+  readonly per: 'model';
+  readonly match: { readonly name: 'Tag' };
+  readonly prefix: 'labelled';
+  readonly suffix: '';
+  readonly parameters: readonly [label: string];
+}
+
+interface ClashRuleB extends CollectionMethodRule {
+  readonly per: 'model';
+  readonly match: { readonly name: 'Tag' };
+  readonly prefix: 'labelled';
+  readonly suffix: '';
+  readonly parameters: readonly [label: string, exact: boolean];
+}
+
+declare module '../src/collection-method-rules' {
+  interface CollectionMethodRuleRegistry {
+    readonly 'postgres/fullText': FullTextRule;
+    readonly 'test/closest': ClosestRule;
+    readonly 'test/as-of': AsOfRule;
+    readonly 'test/clash-a': ClashRuleA;
+    readonly 'test/clash-b': ClashRuleB;
+  }
 }
 
 declare module '@internal/sql-relational-core/query-lane-context' {
