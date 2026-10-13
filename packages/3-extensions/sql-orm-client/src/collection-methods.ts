@@ -5,13 +5,21 @@ import type {
   CollectionMethodContribution,
   CollectionMethodModelView,
   CollectionMethodReceiver,
+  CollectionMethodRegistry,
   ExecutionContext,
 } from '@internal/sql-relational-core/query-lane-context';
-import type { RuleTables } from './collection-method-rules';
 import type { Filtered, Ordered } from './collection-types';
 import { ormError } from './orm-errors';
 import { resolveTableForContract } from './storage-resolution';
 import type { CollectionMethodModelOf } from './types';
+
+type ContributionId = Exclude<keyof CollectionMethodRegistry, '__collectionMethodRegistry'>;
+
+type MethodsOf<Entry, Model> = (Entry & { readonly model: Model })['methods' & keyof Entry];
+
+type ContributedTables<Model> = {
+  readonly [Id in ContributionId]: MethodsOf<CollectionMethodRegistry[Id], Model>;
+};
 
 type MethodNames<Tables> = { [Id in keyof Tables]: keyof Tables[Id] }[keyof Tables];
 
@@ -51,7 +59,7 @@ export type ModelCollectionMethodTable<
   NsId extends string,
 > = string extends ModelName | NsId
   ? Record<never, never>
-  : MergedTable<RuleTables<CollectionMethodModelOf<TContract, ModelName, NsId>>, ModelName>;
+  : MergedTable<ContributedTables<CollectionMethodModelOf<TContract, ModelName, NsId>>, ModelName>;
 
 /** The contributed methods of a model's collection `Self`. */
 export type CollectionMethods<
