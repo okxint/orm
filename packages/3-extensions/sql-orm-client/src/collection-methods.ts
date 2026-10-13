@@ -15,11 +15,7 @@ import type { CollectionMethodModelOf } from './types';
 
 type ContributionId = Exclude<keyof CollectionMethodRegistry, '__collectionMethodRegistry'>;
 
-type MethodsOf<Entry, Model> = Entry & { readonly model: Model } extends {
-  readonly methods: infer Methods;
-}
-  ? Methods
-  : never;
+type MethodsOf<Entry, Model> = (Entry & { readonly model: Model })['methods' & keyof Entry];
 
 type ContributedTables<Model> = {
   readonly [Id in ContributionId]: MethodsOf<CollectionMethodRegistry[Id], Model>;
